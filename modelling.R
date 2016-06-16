@@ -28,42 +28,63 @@ set.seed(737)
 row_sample_1 <- sample(nrow(data),size=1,replace=TRUE)
 row_sample_2 <- sample(nrow(data),size=1,replace=TRUE)
 
-m1 <- data[row_sample1, ]
-m2 <- data[row_sample2, ]
+m1 <- data[row_sample_1, ]
+m2 <- data[row_sample_2, ]
 sd1 <- var(data)
 sd2 <- var(data)
 pi <- 0.5
 
+init <- c(m1, m2, sd1, sd2, pi)
+
 ## avoid spurious accuracy
 op <- options(digits = 3)
-set.seed(123)
-x <- rgamma(100, shape = 5, rate = 0.1)
 
-pop <- data.frame(pop = x)
-ggplot(pop, aes(x = pop)) + geom_density() + xlim(0, 150)
+#### Psuedo code
+#### 1. Use pi to randomly determine which dist a given sample is from
+#### 2. Update mu and sd based on upated sample
+#### 3. Use sample to generate distribution from MASS package, save MLE
+#### 3.5 This will be done twice for each adjustment of pi as there are two distributions
+#### Do we take the higher of the MLE and go with that? For instance if a decrease in pi drove ML up then logic would dictate you
+#### should keep doing it until you get a result
+#### 4. Iterate until convergence of pi and mu/sd
+#### 5. After convergence return the parameters for each of the distributions
 
-fitdistr(x, "gamma")
+mixture_model <- function(initial_params, X){
+  
+  ### initial_params : a list of variables holding first estimates of mu, sd and pi
+  ### data : the population from which the underlying subpopulations are being investigated
+  ### returns : TBC
+  
+  pop <- as.matrix(X)
+  rows <- nrow(pop)
+  
+  elements_1 <- pi * rows
+  elements_2 <- (1 - pi) * rows
+  
+  pop1 <- sample(pop, elements_1, replace=FALSE)
+  pop2 <- setdiff(pop, pop1)
+      
+}
 
-# now do this directly with more control.
-fitdistr(x, dgamma, list(shape = 1, rate = 0.1), lower = 0.001)
+list[pop1, pop2] <- mixture_model(init, data)
+length(pop)
+### initial_params : a list of variables holding first estimates of mu, sd and pi
+### data : the population from which the underlying subpopulations are being investigated
+### returns : TBC
 
-set.seed(123)
-x2 <- rt(250, df = 9)
-fitdistr(x2, "t", df = 9)
+pop <- as.matrix(data)
+rows <- nrow(pop)
 
-## allow df to vary: not a very good idea!
-fitdistr(x2, "t")
+elements_1 <- pi * rows
+elements_2 <- (1 - pi) * rows
 
-## now do fixed-df fit directly with more control.
-mydt <- function(x, m, s, df) dt((x-m)/s, df)/s
+pop1 <- sample(pop, elements_1, replace=FALSE)
+pop2 <- pop[sample(pop, elements_2, replace=TRUE), ]
 
-fitdistr(x2, mydt, list(m = 0, s = 1), df = 9, lower = c(-Inf, 0))
+  
+head(pop)
 
-set.seed(123)
-x3 <- rweibull(100, shape = 4, scale = 100)
-fitdistr(x3, "weibull")
 
-set.seed(123)
-x4 <- rnegbin(500, mu = 5, theta = 4)
-fitdistr(x4, "Negative Binomial")
-options(op)
+nrow(pop)
+
+sample(data, pi * nrow(data), replace=TRUE)
