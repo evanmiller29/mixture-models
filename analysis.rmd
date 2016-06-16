@@ -1,0 +1,29 @@
+---
+title: "Mixure Models"
+author: "Evan Miller"
+date: "Thursday, June 16, 2016"
+output: word_document
+---
+
+This R markdown document will highlight the process used to estimate a mixture model from the underlying population data.
+The data has:
+
+* 8000 members;
+* data generated from 2 separate beta distributions
+
+I need to:
+
+* Find the maximum likelihood estimate (MLE) for the parameters of each component beta distribution
+* Find the percentage of the data coming from each component beta distribution (5 parameters in total).
+
+```{r}
+summary(cars)
+```
+
+You can also embed plots, for example:
+
+```{r, echo=FALSE}
+plot(cars)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
