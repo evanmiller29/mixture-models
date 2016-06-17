@@ -16,14 +16,27 @@ I need to:
 * Find the maximum likelihood estimate (MLE) for the parameters of each component beta distribution
 * Find the percentage of the data coming from each component beta distribution (5 parameters in total).
 
-```{r}
-summary(cars)
-```
-
-You can also embed plots, for example:
-
 ```{r, echo=FALSE}
-plot(cars)
+library(ggplot2)
+
+basepath <- 'C:/Users/evanm_000/Documents/GitHub/mixture-models'
+setwd(basepath)
+
+data <- read.table("EvanExercise.dat", header=FALSE)
+colnames(data) <- 'population'
+
+ggplot(data, aes(x = population)) + geom_density() + xlim(0, 1.1) +theme_minimal() + ggtitle('Overview of population')
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+After looking at the graph there are two peaks. One at 0.1 and one at 0.95. However this doesn't give me much help as the beta distribtuion is characterised by it's alpha and beta parameters, not the mean and standard deviation.
+
+The approach I have taken is as follows:
+
+1. Given initial values for the beta distributions calculate the probability that a given observation would arise from either of the two beta distributions
+2. Use these probabilities to calculate the class responsibilities
+3. Draw randomly from a bernoulli distribution a class that is based off the observation's class responsibilities
+4. Use the fitdistr function to fit a beta distribution for each class
+5. Repeat this for a given number of iterations (minimum 10) and take the median of these parameters
+6. Calculate the mixing proportion pi
+7. Check if convergence has been achieved by differencing the initial and calculated parameters
+8. If convergence hasn't been achieved repeat the process with the calculated parameters as inputs

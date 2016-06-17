@@ -25,9 +25,13 @@ pop = as.matrix(data)
 #### Starting points are as below. Will use K means to generate more reasonable estimates in future
 #### Reducing the size of the starting points to make them more feasible
 
-alpha1 <- 0.5
+#### Using k means to select a starting point for the algo:
+
+kmeans <- kmeans(data, 2, iter.max = 1000, nstart = 1)
+
+alpha1 <- kmeans$centers[1]
 beta1 <- 0.125
-alpha2 <- 0.5
+alpha2 <- kmeans$centers[2]
 beta2 <- 0.25
 pi <- 0.5
 
@@ -37,8 +41,11 @@ fit_beta <- function(df, shp1, shp2, class){
   
   ### df: the dataframe of results containing:
   ###     obs: the original observations
-  ###     resp: the class responsiveness
-  ### params: the parameters required for fitting the beta distribution
+  ###     resp: the class responsiveness calculation
+  ###     class: the randomly drawn class membership determined by resp
+  ### shp1: the initial alpha estimate for the underlying beta dist
+  ### shp2: the initial beta estimate for the underlying beta dist
+  ### class: the class variable determining which class will have it's beta dist fitted
   
   pop_class <- as.matrix(df$obs[df$class == class])
   beta_dist <- fitdistr(pop_class, dbeta, list(shape1 = shp1, shape2 = shp2))
@@ -59,6 +66,7 @@ comp_resp <- function(x, init_params, n_iter, threshold){
   ###             4 = beta parameter for second dist
   ###             5 = the class split
   ### n_iter: the number of times the estimation process will be run to generate results
+  ### threshold: a parameter to determine whether the model run should stop
   
   alpha1 <- init_params[1]
   beta1 <- init_params[2]
@@ -66,12 +74,10 @@ comp_resp <- function(x, init_params, n_iter, threshold){
   beta2 <- init_params[4]
   pi <- init_params[5]
 
-  resp <- NULL
-  initial_pop1 <- NULL
-  initial_pop2 <- NULL
-  
   initial_pop1 <- sapply(1:length(x), function(y) pbeta(x[y], alpha1, beta1, ncp = 0, lower.tail = TRUE, log.p = FALSE))
   initial_pop2 <- sapply(1:length(x), function(y) pbeta(x[y], alpha2, beta2, ncp = 0, lower.tail = TRUE, log.p = FALSE))
+
+  resp <- NULL
   
   for (i in 1:length(x)){
     
@@ -128,4 +134,14 @@ comp_resp <- function(x, init_params, n_iter, threshold){
      return(as.numeric(output))
 }
 
-estimates <- comp_resp(pop, init, 1000, 0.001)
+estimates <- comp_resp(pop, init, 100, 0.001)
+
+alpha1 <- 0.2
+beta1 <- 0.1
+alpha2 <- 0.4
+beta2 <- 0.6
+pi <- 0.5
+
+init <- c(alpha1, beta1, alpha2, beta2, pi)
+
+estimates_1 <- comp_resp(pop, init, 1000, 0.001)
