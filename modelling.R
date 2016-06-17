@@ -17,6 +17,7 @@ colnames(data) <- 'population'
 #### Getting an overview of what the data looks like
 
 ggplot(data, aes(x = population)) + geom_density() + xlim(0, 1.1) +theme_minimal() + ggtitle('Overview of population')
+colnames(data) <- NULL
 
 set.seed(737)
 pop = as.matrix(data)
@@ -24,8 +25,8 @@ pop = as.matrix(data)
 #### Starting points are as below. Will use K means to generate more reasonable estimates in future
 #### Reducing the size of the starting points to make them more feasible
 
-alpha1 <- 0.55
-beta1 <- 0.124
+alpha1 <- 0.5
+beta1 <- 0.125
 alpha2 <- 0.5
 beta2 <- 0.25
 pi <- 0.5
@@ -34,7 +35,23 @@ init <- c(alpha1, beta1, alpha2, beta2, pi)
 
 initial <- pop[1]
 
-comp_resp <- function(x, init_params){
+fit_beta <- function(df, shp1, shp2, class){
+  
+  ### df: the dataframe of results containing:
+  ###     obs: the original observations
+  ###     resp: the class responsiveness
+  ### params: the parameters required for fitting the beta distribution
+  
+  pop_class <- as.matrix(df$obs[df$class == class])
+  beta_dist <- fitdistr(pop_class, dbeta, list(shape1 = shp1, shape2 = shp2))
+  
+  dist <- c(beta_dist$estimate['shape1'], beta_dist$estimate['shape2'])
+  
+  return(dist)
+  
+}
+
+comp_resp <- function(x, init_params, n_iter){
   
   ### x: the observations for which responsibilties will be calculated
   ### init_params: the initial values for the beta distributions
@@ -43,6 +60,7 @@ comp_resp <- function(x, init_params){
   ###             3 = alpha parameter for second dist
   ###             4 = beta parameter for second dist
   ###             5 = the class split
+  ### n_iter: the number of times the estimation process will be run to generate results
   
   alpha1 <- init_params[1]
   beta1 <- init_params[2]
@@ -51,89 +69,70 @@ comp_resp <- function(x, init_params){
   pi <- init_params[5]
 
   resp <- NULL
-  class_member <- NULL
   initial_pop1 <- NULL
   initial_pop2 <- NULL
   
+  initial_pop1 <- sapply(1:length(x), function(y) pbeta(x[y], alpha1, beta1, ncp = 0, lower.tail = TRUE, log.p = FALSE))
+  initial_pop2 <- sapply(1:length(x), function(y) pbeta(x[y], alpha2, beta2, ncp = 0, lower.tail = TRUE, log.p = FALSE))
+  
   for (i in 1:length(x)){
     
-    initial_pop1[i] <- pbeta(x[i], alpha1, beta1, ncp = 0, lower.tail = TRUE, log.p = FALSE)
-    initial_pop2[i] <- pbeta(x[i], alpha2, beta2, ncp = 0, lower.tail = TRUE, log.p = FALSE)
+    #initial_pop1[i] <- pbeta(x[i], alpha1, beta1, ncp = 0, lower.tail = TRUE, log.p = FALSE)
+    #initial_pop2[i] <- pbeta(x[i], alpha2, beta2, ncp = 0, lower.tail = TRUE, log.p = FALSE)
       
     resp[i] = (pi * initial_pop2[i]) / ((1 - pi) * initial_pop1[i] + pi * initial_pop2[i])
-
-    #### Now want to add bernoulli random draws to split into two classes. Split determined on pi
-    
-    class_member[i] <- rbinom(n = 1, size = 1, prob = pi)
     
     #### Iterate over these draws 8000-10000 times to get median parameters for next iteration
     #### Keep going until we get convergence
   }
   
-  #### Do I fit the beta distributions based on the observations or the responsiveness measure for the classes?
-    
-  results <- data.frame(obs = x, resp = resp, class = class_member)
-  dists <- fit_beta(results, init_params)
+  nrow <- NULL
+  class_alloc <- NULL
   
-  return(dists)
+  shape1_0 <- NULL
+  shape2_0 <- NULL
+  
+  shape1_1 <- NULL
+  shape2_1 <- NULL
+  
+  for (i in 1:n_iter){
+    
+    #### Now want to add bernoulli random draws to split into two classes. Split conditional on resp
+#    for (j in 1:length(x)){
+#      class_alloc[j] <- rbinom(n = 1, size = 1, prob = resp[j])
+    
+#    }
+    
+    class_alloc <- sapply(1:length(resp), function(x) rbinom(n = 1, size = 1, prob = resp[x]))
+    #### Do I fit the beta distributions based on the observations or the responsiveness measure for the classes?
+        
+    results <- data.frame(obs = x, resp = resp, class = class_alloc)
+
+    dist_0 <- fit_beta(results, alpha2, beta2, 0)
+    dist_1 <- fit_beta(results, alpha1, beta1, 1)
+        
+    nrow[i] <- i
+    
+    shape1_0[i] <- dist_0[[1]]
+    shape2_0[i] <- dist_0[[2]]
+    
+    shape1_1[i] <- dist_1[[1]]
+    shape2_1[i] <- dist_1[[2]]
+      
+    
+  }
+  
+  shape_total_draws <- data.frame(row = nrow, class0_shape1 = shape1_0, class0_shape2 = shape2_0,
+                                  class1_shape1 = shape1_1, class1_shape2 = shape2_1
+                                  )
+  
+  return(shape_total_draws)
+  
 }
 
-fit_beta <- function(df, params){
-    
-  pop1 <- as.matrix(df$population[df$class == 1])
-  pop2 <- as.matrix(df$population[df$class == 0])
-  
-  beta_dist1 <- fitdistr(pop1, dbeta, list(shape1 = params[1], shape2 = params[2]))
-  beta_dist2 <- fitdistr(pop2, dbeta, list(shape1 = params[3], shape2 = params[4]))
-  
-  dists <- c(beta_dist1, beta_dist2)
-  
-  return(dists)
-  
-}
+init_dists <- comp_resp(pop, init, 100)
+init_dists[[1]]
 
-init_dists <- comp_resp(pop, init)
-init_dists[1]
+summary(as.factor(init_dists$class))
 
-data.frame(resp = first_results) %>%
-    ggplot(., aes(x = resp)) + geom_density()
-
-#### Psuedo code
-#### 1. Use pi to randomly determine which dist a given sample is from
-#### 2. Update mu and sd based on upated sample
-#### 3. Use sample to generate distribution from MASS package, save MLE
-#### 3.5 This will be done twice for each adjustment of pi as there are two distributions
-#### Do we take the higher of the MLE and go with that? For instance if a decrease in pi drove ML up then logic would dictate you
-#### should keep doing it until you get a result
-#### 4. Iterate until convergence of pi and mu/sd
-#### 5. After convergence return the parameters for each of the distributions
-
-## avoid spurious accuracy
-op <- options(digits = 3)
-set.seed(123)
-x <- rgamma(100, shape = 5, rate = 0.1)
-fitdistr(x, "gamma")
-
-
-x <- rbeta(100, shape1 = 5, shape2 = 10)
-fitdistr(x, dbeta, list(shape1 = 1, shape2 = 2))
-
-## now do this directly with more control.
-fitdistr(x, dgamma, list(shape = 1, rate = 0.1), lower = 0.001)
-
-set.seed(123)
-x2 <- rt(250, df = 9)
-fitdistr(x2, "t", df = 9)
-## allow df to vary: not a very good idea!
-fitdistr(x2, "t")
-## now do fixed-df fit directly with more control.
-mydt <- function(x, m, s, df) dt((x-m)/s, df)/s
-fitdistr(x2, mydt, list(m = 0, s = 1), df = 9, lower = c(-Inf, 0))
-set.seed(123)
-x3 <- rweibull(100, shape = 4, scale = 100)
-fitdistr(x3, "weibull")
-set.seed(123)
-x4 <- rnegbin(500, mu = 5, theta = 4)
-fitdistr(x4, "Negative Binomial")
-options(op)
-
+summary(df)
