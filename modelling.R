@@ -4,7 +4,7 @@ library(dplyr)
 
 #### Reading in the data
 
-op <- options(digits = 3)
+op <- options(digits = 7)
 
 rm(list = ls())
 
@@ -18,23 +18,16 @@ colnames(data) <- 'population'
 
 ggplot(data, aes(x = population)) + geom_density() + xlim(0, 1.1) +theme_minimal() + ggtitle('Overview of population')
 
-#### Setting up the initial values for the Mixture Model
-
 set.seed(737)
-
-#### Initial guesses will just be:
-#### mu = random element
-#### sd = population variance
-#### mixing proportion = 0.5
-
 pop = as.matrix(data)
 
 #### Starting points are as below. Will use K means to generate more reasonable estimates in future
+#### Reducing the size of the starting points to make them more feasible
 
-alpha1 <- 5
-beta1 <- 1
-alpha2 <- 10
-beta2 <- 5
+alpha1 <- 0.55
+beta1 <- 0.124
+alpha2 <- 0.5
+beta2 <- 0.25
 pi <- 0.5
 
 init <- c(alpha1, beta1, alpha2, beta2, pi)
@@ -58,6 +51,9 @@ comp_resp <- function(x, init_params){
   pi <- init_params[5]
 
   resp <- NULL
+  class_member <- NULL
+  initial_pop1 <- NULL
+  initial_pop2 <- NULL
   
   for (i in 1:length(x)){
     
@@ -65,16 +61,39 @@ comp_resp <- function(x, init_params){
     initial_pop2[i] <- pbeta(x[i], alpha2, beta2, ncp = 0, lower.tail = TRUE, log.p = FALSE)
       
     resp[i] = (pi * initial_pop2[i]) / ((1 - pi) * initial_pop1[i] + pi * initial_pop2[i])
+
+    #### Now want to add bernoulli random draws to split into two classes. Split determined on pi
     
-    #### Now want to add bernoulli random draws to split into two classes
+    class_member[i] <- rbinom(n = 1, size = 1, prob = pi)
+    
     #### Iterate over these draws 8000-10000 times to get median parameters for next iteration
     #### Keep going until we get convergence
   }
   
-  return(resp)
+  #### Do I fit the beta distributions based on the observations or the responsiveness measure for the classes?
+    
+  results <- data.frame(obs = x, resp = resp, class = class_member)
+  dists <- fit_beta(results, init_params)
+  
+  return(dists)
 }
 
-first_results <- comp_resp(pop, init)
+fit_beta <- function(df, params){
+    
+  pop1 <- as.matrix(df$population[df$class == 1])
+  pop2 <- as.matrix(df$population[df$class == 0])
+  
+  beta_dist1 <- fitdistr(pop1, dbeta, list(shape1 = params[1], shape2 = params[2]))
+  beta_dist2 <- fitdistr(pop2, dbeta, list(shape1 = params[3], shape2 = params[4]))
+  
+  dists <- c(beta_dist1, beta_dist2)
+  
+  return(dists)
+  
+}
+
+init_dists <- comp_resp(pop, init)
+init_dists[1]
 
 data.frame(resp = first_results) %>%
     ggplot(., aes(x = resp)) + geom_density()
@@ -88,3 +107,33 @@ data.frame(resp = first_results) %>%
 #### should keep doing it until you get a result
 #### 4. Iterate until convergence of pi and mu/sd
 #### 5. After convergence return the parameters for each of the distributions
+
+## avoid spurious accuracy
+op <- options(digits = 3)
+set.seed(123)
+x <- rgamma(100, shape = 5, rate = 0.1)
+fitdistr(x, "gamma")
+
+
+x <- rbeta(100, shape1 = 5, shape2 = 10)
+fitdistr(x, dbeta, list(shape1 = 1, shape2 = 2))
+
+## now do this directly with more control.
+fitdistr(x, dgamma, list(shape = 1, rate = 0.1), lower = 0.001)
+
+set.seed(123)
+x2 <- rt(250, df = 9)
+fitdistr(x2, "t", df = 9)
+## allow df to vary: not a very good idea!
+fitdistr(x2, "t")
+## now do fixed-df fit directly with more control.
+mydt <- function(x, m, s, df) dt((x-m)/s, df)/s
+fitdistr(x2, mydt, list(m = 0, s = 1), df = 9, lower = c(-Inf, 0))
+set.seed(123)
+x3 <- rweibull(100, shape = 4, scale = 100)
+fitdistr(x3, "weibull")
+set.seed(123)
+x4 <- rnegbin(500, mu = 5, theta = 4)
+fitdistr(x4, "Negative Binomial")
+options(op)
+
