@@ -4,7 +4,7 @@ library(dplyr)
 
 #### Reading in the data
 
-op <- options(digits = 7)
+op <- options(digits = 4)
 
 rm(list = ls())
 
@@ -33,8 +33,6 @@ pi <- 0.5
 
 init <- c(alpha1, beta1, alpha2, beta2, pi)
 
-initial <- pop[1]
-
 fit_beta <- function(df, shp1, shp2, class){
   
   ### df: the dataframe of results containing:
@@ -51,7 +49,7 @@ fit_beta <- function(df, shp1, shp2, class){
   
 }
 
-comp_resp <- function(x, init_params, n_iter){
+comp_resp <- function(x, init_params, n_iter, threshold){
   
   ### x: the observations for which responsibilties will be calculated
   ### init_params: the initial values for the beta distributions
@@ -77,16 +75,12 @@ comp_resp <- function(x, init_params, n_iter){
   
   for (i in 1:length(x)){
     
-    #initial_pop1[i] <- pbeta(x[i], alpha1, beta1, ncp = 0, lower.tail = TRUE, log.p = FALSE)
-    #initial_pop2[i] <- pbeta(x[i], alpha2, beta2, ncp = 0, lower.tail = TRUE, log.p = FALSE)
-      
     resp[i] = (pi * initial_pop2[i]) / ((1 - pi) * initial_pop1[i] + pi * initial_pop2[i])
     
-    #### Iterate over these draws 8000-10000 times to get median parameters for next iteration
-    #### Keep going until we get convergence
   }
+ 
+  #### Keep going until we get convergence
   
-  nrow <- NULL
   class_alloc <- NULL
   
   shape1_0 <- NULL
@@ -97,12 +91,6 @@ comp_resp <- function(x, init_params, n_iter){
   
   for (i in 1:n_iter){
     
-    #### Now want to add bernoulli random draws to split into two classes. Split conditional on resp
-#    for (j in 1:length(x)){
-#      class_alloc[j] <- rbinom(n = 1, size = 1, prob = resp[j])
-    
-#    }
-    
     class_alloc <- sapply(1:length(resp), function(x) rbinom(n = 1, size = 1, prob = resp[x]))
     #### Do I fit the beta distributions based on the observations or the responsiveness measure for the classes?
         
@@ -110,29 +98,34 @@ comp_resp <- function(x, init_params, n_iter){
 
     dist_0 <- fit_beta(results, alpha2, beta2, 0)
     dist_1 <- fit_beta(results, alpha1, beta1, 1)
-        
-    nrow[i] <- i
     
     shape1_0[i] <- dist_0[[1]]
     shape2_0[i] <- dist_0[[2]]
     
     shape1_1[i] <- dist_1[[1]]
     shape2_1[i] <- dist_1[[2]]
-      
     
   }
   
-  shape_total_draws <- data.frame(row = nrow, class0_shape1 = shape1_0, class0_shape2 = shape2_0,
-                                  class1_shape1 = shape1_1, class1_shape2 = shape2_1
-                                  )
+  pi_updated <- sum(resp) / length(x)
   
-  return(shape_total_draws)
+  output <- list(median(shape1_0), median(shape2_0), median(shape1_1), median(shape2_1), pi_updated)
   
+  diff <- c(alpha1 - output[[1]], beta1 - output[[2]], alpha2 - output[[3]], beta2 - output[[4]], pi - output[[5]])
+  
+  if (min(abs(diff)) > threshold){
+    
+     print ('Running recursion..')     
+   
+     n <- n_iter
+     thres <- threshold
+     
+     comp_resp(x, as.numeric(output), n, thres)
+     
+   }
+   
+     print('Exiting program')
+     return(as.numeric(output))
 }
 
-init_dists <- comp_resp(pop, init, 100)
-init_dists[[1]]
-
-summary(as.factor(init_dists$class))
-
-summary(df)
+estimates <- comp_resp(pop, init, 1000, 0.001)
