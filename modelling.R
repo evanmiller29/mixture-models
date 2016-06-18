@@ -92,21 +92,6 @@ comp_params <- function(x, init_params, n_iter = 100, scale){
   for (i in 1:n_iter){
       
         class_matrix[i, ] <- sapply(1:length(resp), function(y) rbinom(n = 1, size = 1, prob = resp[y]))
-#       class_alloc <- sapply(1:length(resp), function(y) rbinom(n = 1, size = 1, prob = resp[y]))
-#       class_alloc[class_alloc == 0.5] <- rbinom(n = 1, size = 1, prob = 0.5)
-#       df <- data.frame(pop = x, class = class_alloc)
-#       
-#       pop_0 <- as.numeric(df$pop[df$class == 0])
-#       pop_1 <- as.numeric(df$pop[df$class == 1])
-#       
-#       dist_0 <- fit_beta(pop_0, alpha1, beta1, scale)
-#       dist_1 <- fit_beta(pop_1, alpha2, beta2, scale)
-#       
-#       results[i, 1] <- dist_0['shape1'] ### alpha estimate for latent class 0
-#       results[i, 2] <- dist_0['shape2'] ### beta estimate for latent class 0
-#       results[i, 3] <- dist_1['shape1'] ### alpha estimate for latent class 1
-#       results[i, 4] <- dist_1['shape2'] ### beta estimate for latent class 1
-#       results[i, 5] <- sum(resp) / length(x) ### Splitting parameter
   }
   
   class_alloc <- apply(class_matrix, 2, median)
@@ -130,7 +115,6 @@ comp_params <- function(x, init_params, n_iter = 100, scale){
     
   pi_updated <- sum(resp) / length(x)
     
-#   output <- c(median(results[, 1]), median(results[, 2]), median(results[, 3]), median(results[, 4]), median(results[, 5]))
   output <- c(shape1_0, shape2_0, shape1_1, shape2_1, pi_updated)
    
   print('Exiting program')
