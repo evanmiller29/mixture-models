@@ -43,7 +43,7 @@ fit_beta <- function(subpop, shp1, shp2, scale){
   ### shp1: the initial alpha estimate for the underlying beta dist
   ### shp2: the initial beta estimate for the underlying beta dist
   
-  beta_dist <- fitdistr(subpop, dbeta, list(shape1 = shp1, shape2 = shp2), lower=0.01)
+  beta_dist <- fitdistr(subpop, dbeta, list(shape1 = shp1 / scale, shape2 = shp2 / scale), lower=0.01)
   dist <- c(beta_dist$estimate['shape1'], beta_dist$estimate['shape2'])
   
   return(dist)
@@ -83,42 +83,58 @@ comp_params <- function(x, init_params, n_iter = 100, scale){
    
   }
   
-  results <- matrix(nrow = n_iter, ncol = 5)
-  
   ### Using randomly allocating the number of 
-  
+
+  results <- matrix(nrow = n_iter, ncol = 5)
   class_matrix <- matrix(nrow = n_iter, ncol = length(pop))
+  df <- NULL
   
   for (i in 1:n_iter){
       
         class_matrix[i, ] <- sapply(1:length(resp), function(y) rbinom(n = 1, size = 1, prob = resp[y]))
+        # Add in drawing curves etc
+        class_alloc <- class_matrix[i, ]
+        class_alloc[class_alloc == 0.5] <- rbinom(n = 1, size = 1, prob = 0.5)
+        df <- data.frame(pop = x, class_type = class_alloc)
+         
+        pop_0 <- as.numeric(df$pop[df$class_type == 0])
+        pop_1 <- as.numeric(df$pop[df$class_type == 1])
+         
+        dist_0 <- fit_beta(pop_0, alpha1, beta1, scale)
+        dist_1 <- fit_beta(pop_1, alpha2, beta2, scale)
+         
+         results[i, 1] <- dist_0['shape1'] ### alpha parameter estimate for latent class 0
+         results[i, 2] <- dist_0['shape2'] ### beta parameter estimate for latent class 0
+         results[i, 3] <- dist_1['shape1'] ### alpha parameter estimate for latent class 1
+         results[i, 4] <- dist_1['shape2'] ### beta parameter estimate for latent class 1
+         results[i, 5] <- sum(resp) / length(x) ### Class membership split
   }
   
-  class_alloc <- apply(class_matrix, 2, median)
-  class_alloc[class_alloc == 0.5] <- rbinom(n = 1, size = 1, prob = 0.5)
+#   class_alloc <- apply(class_matrix, 2, median)
+#  class_alloc[class_alloc == 0.5] <- rbinom(n = 1, size = 1, prob = 0.5)
    
   ### Dealing with classes that have medians of 0.5 (balanced counts of 0's and 1's). Should be very unlikey outside testing
   
-  df <- data.frame(pop = x, class = class_alloc)
-  
-  pop_0 <- as.numeric(df$pop[df$class == 0])
-  pop_1 <- as.numeric(df$pop[df$class == 1])
-  
-  dist_0 <- fit_beta(pop_0, alpha1, beta1, scale)
-  dist_1 <- fit_beta(pop_1, alpha2, beta2, scale)
-      
-  shape1_0 <- dist_0['shape1']
-  shape2_0 <- dist_0['shape2']
-      
-  shape1_1 <- dist_1['shape1']
-  shape2_1 <- dist_1['shape2']
-    
-  pi_updated <- sum(resp) / length(x)
-    
-  output <- c(shape1_0, shape2_0, shape1_1, shape2_1, pi_updated)
+#   df <- data.frame(pop = x, class = class_alloc)
+#   
+#   pop_0 <- as.numeric(df$pop[df$class == 0])
+#   pop_1 <- as.numeric(df$pop[df$class == 1])
+#   
+#   dist_0 <- fit_beta(pop_0, alpha1, beta1, scale)
+#   dist_1 <- fit_beta(pop_1, alpha2, beta2, scale)
+#       
+#   shape1_0 <- dist_0['shape1'] ### alpha parameter estimate for latent class 0
+#   shape2_0 <- dist_0['shape2'] ### beta parameter estimate for latent class 0
+#   shape1_1 <- dist_1['shape1'] ### alpha parameter estimate for latent class 1
+#   shape2_1 <- dist_1['shape2'] ### beta parameter estimate for latent class 1
+#   pi_updated <- sum(resp) / length(x) ### Class membership split
+#     
+#   output <- c(shape1_0, shape2_0, shape1_1, shape2_1, pi_updated)
    
   print('Exiting program')
-   return(output)
+
+  output <- apply(results, 2, median)
+  return(output)
 
 }
 
@@ -139,7 +155,7 @@ pi <- 0.5
 
 init <- c(alpha1, beta1, alpha2, beta2, pi)
 
-est1 <- comp_params(x_test, init, 1000, 1)
+est1 <- comp_params(x_test, init, 150, 1)
 est2 <- comp_params(x_test, est1, 1000, 1)
 est3 <- comp_params(x_test, est2, 1000, 1)
 est4 <- comp_params(x_test, est3, 1000, 1)
@@ -159,9 +175,9 @@ myMix <- UnivarMixingDistribution(Beta(shape1=10, shape2=4),
 rmyMix <- r(myMix)
 x_test <- rmyMix(1000)
 
-est1 <- comp_params(x_test, init, 1000, 1)
-est2 <- comp_params(x_test, est1, 1000, 1)
-est3 <- comp_params(x_test, est2, 1000, 1)
-
-
+est1 <- comp_params(x_test, init, 500, 10)
+est2 <- comp_params(x_test, est1, 5000, 10)
+est3 <- comp_params(x_test, est2, 8000, 10)
+est4 <- comp_params(x_test, est3, 8000, 10)
+est5 <- comp_params(x_test, est4, 8000, 10)
 
