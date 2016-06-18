@@ -91,7 +91,22 @@ comp_params <- function(x, init_params, n_iter = 100, scale){
   
   for (i in 1:n_iter){
       
-      class_matrix[i, ] <- sapply(1:length(resp), function(y) rbinom(n = 1, size = 1, prob = resp[y]))
+        class_matrix[i, ] <- sapply(1:length(resp), function(y) rbinom(n = 1, size = 1, prob = resp[y]))
+#       class_alloc <- sapply(1:length(resp), function(y) rbinom(n = 1, size = 1, prob = resp[y]))
+#       class_alloc[class_alloc == 0.5] <- rbinom(n = 1, size = 1, prob = 0.5)
+#       df <- data.frame(pop = x, class = class_alloc)
+#       
+#       pop_0 <- as.numeric(df$pop[df$class == 0])
+#       pop_1 <- as.numeric(df$pop[df$class == 1])
+#       
+#       dist_0 <- fit_beta(pop_0, alpha1, beta1, scale)
+#       dist_1 <- fit_beta(pop_1, alpha2, beta2, scale)
+#       
+#       results[i, 1] <- dist_0['shape1'] ### alpha estimate for latent class 0
+#       results[i, 2] <- dist_0['shape2'] ### beta estimate for latent class 0
+#       results[i, 3] <- dist_1['shape1'] ### alpha estimate for latent class 1
+#       results[i, 4] <- dist_1['shape2'] ### beta estimate for latent class 1
+#       results[i, 5] <- sum(resp) / length(x) ### Splitting parameter
   }
   
   class_alloc <- apply(class_matrix, 2, median)
@@ -115,16 +130,16 @@ comp_params <- function(x, init_params, n_iter = 100, scale){
     
   pi_updated <- sum(resp) / length(x)
     
-  #output <- c(median(results[, 1]), median(results[, 2]), median(results[, 3]), median(results[, 4]), median(results[, 5]))
+#   output <- c(median(results[, 1]), median(results[, 2]), median(results[, 3]), median(results[, 4]), median(results[, 5]))
   output <- c(shape1_0, shape2_0, shape1_1, shape2_1, pi_updated)
    
   print('Exiting program')
-  return(output)
+   return(output)
 
 }
 
 library(distr)
-# 
+ 
 myMix <- UnivarMixingDistribution(Beta(shape1=20, shape2=0.5), 
                                    Beta(shape1=1.5, shape2=20),
                                    mixCoeff=c(0.6, 0.4))
@@ -140,10 +155,29 @@ pi <- 0.5
 
 init <- c(alpha1, beta1, alpha2, beta2, pi)
 
-est1 <- comp_params(x_test, init, 100, 1)
-est2 <- comp_params(x_test, est1, 100, 1)
-est3 <- comp_params(x_test, est2, 100, 1)
-est4 <- comp_params(x_test, est3, 100, 1)
+est1 <- comp_params(x_test, init, 1000, 1)
+est2 <- comp_params(x_test, est1, 1000, 1)
+est3 <- comp_params(x_test, est2, 1000, 1)
+est4 <- comp_params(x_test, est3, 1000, 1)
+
+alpha1 <- 0.5
+beta1 <- 0.25
+alpha2 <- 0.25
+beta2 <- 0.5
+pi <- 0.5
+
+init <- c(alpha1, beta1, alpha2, beta2, pi)
+
+myMix <- UnivarMixingDistribution(Beta(shape1=10, shape2=4), 
+                                  Beta(shape1=7, shape2=10),
+                                  mixCoeff=c(0.8, 0.2))
+
+rmyMix <- r(myMix)
+x_test <- rmyMix(1000)
+
+est1 <- comp_params(x_test, init, 1000, 1)
+est2 <- comp_params(x_test, est1, 1000, 1)
+est3 <- comp_params(x_test, est2, 1000, 1)
 
 
 
