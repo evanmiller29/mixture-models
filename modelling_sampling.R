@@ -13,13 +13,12 @@ setwd(basepath)
 
 data <- read.table("EvanExercise.dat", header=FALSE)
 colnames(data) <- 'population'
-
 set.seed(737)
 pop = as.matrix(data)
 
 comp_params <- function(x, init_params, n_iter = 100, run_all){
   
-  ### output: 
+  ### output: fitted estimates for each of the initial parameters
   ### x: the observations for which responsibilties will be calculated
   ### init_params: the initial values for the beta distributions
   ###             1 = alpha parameter for first dist
@@ -30,7 +29,7 @@ comp_params <- function(x, init_params, n_iter = 100, run_all){
   ### n_iter: the number of times the estimation process will be run to generate results. Default value = 100
   ### run_all: 
   ###         - TRUE: Runs the much larger sampling method for estimating the beta parameters
-  ###         - FALSE: Fits a simple beta distribution to the median class memberships from the bernoulli draws. Good for getting a baseline
+  ###         - FALSE: Fits a single beta distribution to the median class memberships from the bernoulli draws. Good for getting a baseline
   
   alpha1 <- init_params[1]
   beta1 <- init_params[2]
@@ -108,11 +107,10 @@ comp_params <- function(x, init_params, n_iter = 100, run_all){
   
     results[ ,5] <- sum(resp) / length(x) ### Class membership split
     output <- apply(results, 2, median)
-  
   }
-  print('Exiting program')
+  
+  
   return(output)
-
 }
 
 fit_beta <- function(subpop, shp1, shp2){
@@ -123,7 +121,6 @@ fit_beta <- function(subpop, shp1, shp2){
   ### shp2: the initial beta estimate for the underlying beta dist
   ### note: BFGS method was defined as the out of the box estimator kept giving errors. See here for more information:
   ### http://www.inside-r.org/r-doc/stats/optim
-  
   
   beta_dist <- fitdistr(subpop, dbeta, list(shape1 = shp1, shape2 = shp2), method = "BFGS")
   dist <- c(beta_dist$estimate['shape1'], beta_dist$estimate['shape2'])
@@ -147,7 +144,7 @@ graph_results <- function(population, estimates){
                                     mixCoeff=c(1 - estimates[5], estimates[5]))
   
   rmyMix <- r(myMix)
-  x_test <- rmyMix(8000)
+  x_test <- rmyMix(80000)
   
   
   #### Getting an overview of what the data looks like
@@ -165,54 +162,34 @@ alpha2 <- 0.25
 beta2 <- 0.5
 pi <- 0.5
 
-initial_estimate <- comp_params(pop, init, 5000, FALSE)
-graph_results(pop, initial_estimate)
+init <- c(alpha1, beta1, alpha2, beta2, pi)
 
-### First iteration - small number of random draws
-
-refined_est <- comp_params(pop, initial_estimate, 500, TRUE)
-graph_results(pop, refined_est, 'est_1.png')
-
-refined_est_1 <- comp_params(pop, refined_est, 500, TRUE)
-graph_results(pop, refined_est_1)
-
-refined_est_2 <- comp_params(pop, refined_est_1, 500, TRUE)
-graph_results(pop, refined_est_2)
-
-refined_est_3 <- comp_params(pop, refined_est_2, 500, TRUE)
-graph_results(pop, refined_est_3)
-
-refined_est_4 <- comp_params(pop, refined_est_3, 500, TRUE)
-graph_results(pop, refined_est_4)
-
-refined_est_5 <- comp_params(pop, refined_est_4, 500, TRUE)
-graph_results(pop, refined_est_5)
-
-### Trying out a deeper search of the parameter space
+### Analysing the dataset
+### Using the initial estimates build an initial, high level updated version of the estimates.
 
 initial_estimate <- comp_params(pop, init, 5000, FALSE)
 graph_results(pop, initial_estimate)
 
-refined_est_1_1000 <- comp_params(pop, initial_estimate, 1000, TRUE)
-graph_results(pop, refined_est_1_1000)
+### Running the model using 500 random draws of the beta distribution and taking the median
 
-refined_est_2_1000 <- comp_params(pop, refined_est_1_1000, 1000, TRUE)
-graph_results(pop, refined_est_2_1000)
+refined_est_1_500 <- comp_params(pop, initial_estimate, 500, TRUE)
+refined_est_2_500 <- comp_params(pop, refined_est_1_500, 500, TRUE)
+refined_est_3_500 <- comp_params(pop, refined_est_2_500, 500, TRUE)
+refined_est_4_500 <- comp_params(pop, refined_est_3_500, 500, TRUE)
+refined_est_5_500 <- comp_params(pop, refined_est_4_500, 500, TRUE)
+refined_est_6_500 <- comp_params(pop, refined_est_5_500, 500, TRUE)
+refined_est_7_500 <- comp_params(pop, refined_est_6_500, 500, TRUE)
+refined_est_8_500 <- comp_params(pop, refined_est_7_500, 500, TRUE)
+refined_est_9_500 <- comp_params(pop, refined_est_8_500, 500, TRUE)
+refined_est_10_500 <- comp_params(pop, refined_est_9_500, 500, TRUE)
+refined_est_11_500 <- comp_params(pop, refined_est_10_500, 500, TRUE)
+refined_est_12_500 <- comp_params(pop, refined_est_11_500, 500, TRUE)
+refined_est_13_500 <- comp_params(pop, refined_est_12_500, 500, TRUE)
+refined_est_14_500 <- comp_params(pop, refined_est_13_500, 500, TRUE)
+refined_est_15_500 <- comp_params(pop, refined_est_14_500, 500, TRUE)
+refined_est_16_500 <- comp_params(pop, refined_est_15_500, 500, TRUE)
+refined_est_17_500 <- comp_params(pop, refined_est_16_500, 500, TRUE)
 
-refined_est_3_1000 <- comp_params(pop, refined_est_2_1000, 1000, TRUE)
-graph_results(pop, refined_est_3_1000)
+g1 <- graph_results(pop, refined_est_17_500)
+ggsave('final_run.png', g1)
 
-refined_est_4_1000 <- comp_params(pop, refined_est_3_1000, 1000, TRUE)
-graph_results(pop, refined_est_4_1000)
-
-refined_est_5_1000 <- comp_params(pop, refined_est_4_1000, 1000, TRUE)
-graph_results(pop, refined_est_5_1000)
-
-refined_est_6_1000 <- comp_params(pop, refined_est_5_1000, 1000, TRUE)
-graph_results(pop, refined_est_5_1000)
-
-refined_est_7_1000 <- comp_params(pop, refined_est_6_1000, 1000, TRUE)
-graph_results(pop, refined_est_7_1000)
-
-refined_est_8_1000 <- comp_params(pop, refined_est_7_1000, 1000, TRUE)
-graph_results(pop, refined_est_8_1000)
