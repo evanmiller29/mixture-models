@@ -17,11 +17,9 @@ colnames(data) <- 'population'
 set.seed(737)
 pop = as.matrix(data)
 
-#### Starting points are as below. Will use K means to generate more reasonable estimates in future
-#### Reducing the size of the starting points to make them more feasible
-
 comp_params <- function(x, init_params, n_iter = 100, run_all){
   
+  ### output: 
   ### x: the observations for which responsibilties will be calculated
   ### init_params: the initial values for the beta distributions
   ###             1 = alpha parameter for first dist
@@ -30,7 +28,6 @@ comp_params <- function(x, init_params, n_iter = 100, run_all){
   ###             4 = beta parameter for second dist
   ###             5 = the class split
   ### n_iter: the number of times the estimation process will be run to generate results. Default value = 100
-  ### scale: used to reduce the initial estimates of alpha and beta to be reasonable starting points
   ### run_all: 
   ###         - TRUE: Runs the much larger sampling method for estimating the beta parameters
   ###         - FALSE: Fits a simple beta distribution to the median class memberships from the bernoulli draws. Good for getting a baseline
@@ -48,7 +45,7 @@ comp_params <- function(x, init_params, n_iter = 100, run_all){
   
   resp <- matrix(ncol = length(x))
   
-  ### Normalising class responsibilities to ensure that pi + (1 - pi) = 1
+  ### Normalising class responsibilities to ensure that resp + (1 - resp) = 1
   
   for (i in 1:length(x)){
    
@@ -58,12 +55,10 @@ comp_params <- function(x, init_params, n_iter = 100, run_all){
 
   results <- matrix(nrow = n_iter, ncol = 5)
   class_matrix <- matrix(nrow = n_iter, ncol = length(pop))
-  df <- NULL
   
   for (i in 1:n_iter){
       
         class_matrix[i, ] <- sapply(1:length(resp), function(y) rbinom(n = 1, size = 1, prob = resp[y]))
-        # Add in drawing curves etc
         
         if (run_all == TRUE){
         
@@ -122,9 +117,13 @@ comp_params <- function(x, init_params, n_iter = 100, run_all){
 
 fit_beta <- function(subpop, shp1, shp2){
   
+  ### output: returns estimated parameter estimates for the supplied sub-population
   ### subpop: the number under invesitgation
   ### shp1: the initial alpha estimate for the underlying beta dist
   ### shp2: the initial beta estimate for the underlying beta dist
+  ### note: BFGS method was defined as the out of the box estimator kept giving errors. See here for more information:
+  ### http://www.inside-r.org/r-doc/stats/optim
+  
   
   beta_dist <- fitdistr(subpop, dbeta, list(shape1 = shp1, shape2 = shp2), method = "BFGS")
   dist <- c(beta_dist$estimate['shape1'], beta_dist$estimate['shape2'])
@@ -134,6 +133,11 @@ fit_beta <- function(subpop, shp1, shp2){
 }
 
 graph_results <- function(population, estimates){
+  
+  ### ouptput: a graph comparing the population distribution to the estimated distribution. 
+  ### Population: a matrix representing the data that is to be analysed
+  ### estimates: results from the mixture model fitted on the population data
+  ### Note that as this code does random draws multiple runs will give different estimated curved
   
   library(distr)
   library(reshape2)
@@ -155,42 +159,16 @@ graph_results <- function(population, estimates){
   ggplot(data_adj ,aes(x=value, fill=variable)) + geom_density(alpha=0.25) + theme_minimal() + ggtitle("Plotting actual vs estimated")
 }
 
-library(distr)
- 
-myMix <- UnivarMixingDistribution(Beta(shape1=20, shape2=0.5), 
-                                   Beta(shape1=1.5, shape2=20),
-                                   mixCoeff=c(0.6, 0.4))
-
-rmyMix <- r(myMix)
-x_test <- rmyMix(1000)
-
 alpha1 <- 0.5
 beta1 <- 0.25
 alpha2 <- 0.25
 beta2 <- 0.5
 pi <- 0.5
-
-init <- c(alpha1, beta1, alpha2, beta2, pi)
-
-#### Testing the quick and dirty method. 
-### Unideal as convergence occurs too quickly with too little change in the parameters
-
-est1 <- comp_params(x_test, init, 5000, FALSE)
-est2 <- comp_params(x_test, est1, 5000, FALSE)
-est3 <- comp_params(x_test, est2, 5000, FALSE)
-
-alpha1 <- 0.5
-beta1 <- 0.25
-alpha2 <- 0.25
-beta2 <- 0.5
-pi <- 0.5
-
-### Trying out the data supplied
 
 initial_estimate <- comp_params(pop, init, 5000, FALSE)
 graph_results(pop, initial_estimate)
 
-### First iteration
+### First iteration - small number of random draws
 
 refined_est <- comp_params(pop, initial_estimate, 500, TRUE)
 graph_results(pop, refined_est, 'est_1.png')
@@ -216,7 +194,25 @@ initial_estimate <- comp_params(pop, init, 5000, FALSE)
 graph_results(pop, initial_estimate)
 
 refined_est_1_1000 <- comp_params(pop, initial_estimate, 1000, TRUE)
+graph_results(pop, refined_est_1_1000)
+
 refined_est_2_1000 <- comp_params(pop, refined_est_1_1000, 1000, TRUE)
+graph_results(pop, refined_est_2_1000)
+
 refined_est_3_1000 <- comp_params(pop, refined_est_2_1000, 1000, TRUE)
+graph_results(pop, refined_est_3_1000)
+
 refined_est_4_1000 <- comp_params(pop, refined_est_3_1000, 1000, TRUE)
+graph_results(pop, refined_est_4_1000)
+
 refined_est_5_1000 <- comp_params(pop, refined_est_4_1000, 1000, TRUE)
+graph_results(pop, refined_est_5_1000)
+
+refined_est_6_1000 <- comp_params(pop, refined_est_5_1000, 1000, TRUE)
+graph_results(pop, refined_est_5_1000)
+
+refined_est_7_1000 <- comp_params(pop, refined_est_6_1000, 1000, TRUE)
+graph_results(pop, refined_est_7_1000)
+
+refined_est_8_1000 <- comp_params(pop, refined_est_7_1000, 1000, TRUE)
+graph_results(pop, refined_est_8_1000)
