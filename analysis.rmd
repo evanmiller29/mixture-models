@@ -1,5 +1,5 @@
 ---
-title: "Mixure Models"
+title: "Mixure model estimation process"
 author: "Evan Miller"
 date: "Thursday, June 16, 2016"
 output: word_document
@@ -13,8 +13,10 @@ The data has:
 
 I need to:
 
-* Find the maximum likelihood estimate (MLE) for the parameters of each component beta distribution
-* Find the percentage of the data coming from each component beta distribution (5 parameters in total).
+* Find the maximum likelihood estimate (MLE) for the parameters for each beta distribution ($\alpha$ & $\beta$)
+* Find the percentage of the data coming from each component beta distribution ($\pi$).
+
+**The generated data looks as follows**:
 
 ```{r, echo=FALSE}
 library(ggplot2)
@@ -30,7 +32,7 @@ ggplot(data, aes(x = population)) + geom_density() + xlim(0, 1.1) +theme_minimal
 
 After looking at the graph there are two peaks. One at 0.1 and one at 0.95. However this doesn't give me much help as the beta distribtuion is characterised by it's alpha and beta parameters, not the mean and standard deviation.
 
-The approach I have taken is as follows:
+**The approach I have taken is as follows:**
 
 1. Given initial values for the beta distributions calculate the probability that a given observation would arise from either of the two beta distributions
 2. Use these probabilities to calculate the class responsibilities
@@ -40,3 +42,10 @@ The approach I have taken is as follows:
 6. Calculate the mixing proportion pi
 7. Check if convergence has been achieved by differencing the initial and calculated parameters
 8. If convergence hasn't been achieved repeat the process with the calculated parameters as inputs
+
+**Issues I'm coming up against:**
+
+* I cannot be sure whether I'm seeing a local or global maximum when running this model. To get around this multiple runs will be needed of this recursive approach. I am also experimenting with using k-means to generate initial estimates for the function.
+* The code itself takes a long time to run. I am trying to speed up the code by using vectorised functions instead of loops but the improvements have only been marginal.
+* I am new at working with mixture models. Because of this I am cross validating my approach against a small mixed distribution derived from two normal subpopulations. Once I am fine with the results of this I will derive my own beta distributions to check against (on a smaller scale than the sample data while I work on speeding up the code).
+

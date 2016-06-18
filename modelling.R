@@ -4,7 +4,7 @@ library(dplyr)
 
 #### Reading in the data
 
-op <- options(digits = 4)
+op <- options(digits = 7)
 
 rm(list = ls())
 
@@ -27,36 +27,30 @@ pop = as.matrix(data)
 
 #### Using k means to select a starting point for the algo:
 
-kmeans <- kmeans(data, 2, iter.max = 1000, nstart = 1)
+#kmeans <- kmeans(data, 2, iter.max = 1000, nstart = 1)
 
-alpha1 <- kmeans$centers[1]
-beta1 <- 0.125
-alpha2 <- kmeans$centers[2]
-beta2 <- 0.25
+alpha1 <- 0.5
+beta1 <- 0.25
+alpha2 <- 0.25
+beta2 <- 0.5
 pi <- 0.5
 
 init <- c(alpha1, beta1, alpha2, beta2, pi)
 
-fit_beta <- function(df, shp1, shp2, class){
+fit_beta <- function(subpop, shp1, shp2, scale){
   
-  ### df: the dataframe of results containing:
-  ###     obs: the original observations
-  ###     resp: the class responsiveness calculation
-  ###     class: the randomly drawn class membership determined by resp
+  ### subpop: the number under invesitgation
   ### shp1: the initial alpha estimate for the underlying beta dist
   ### shp2: the initial beta estimate for the underlying beta dist
-  ### class: the class variable determining which class will have it's beta dist fitted
   
-  pop_class <- as.matrix(df$obs[df$class == class])
-  beta_dist <- fitdistr(pop_class, dbeta, list(shape1 = shp1, shape2 = shp2))
-  
+  beta_dist <- fitdistr(subpop, dbeta, list(shape1 = shp1, shape2 = shp2), lower=0.01)
   dist <- c(beta_dist$estimate['shape1'], beta_dist$estimate['shape2'])
   
   return(dist)
   
 }
 
-comp_resp <- function(x, init_params, n_iter, threshold){
+comp_params <- function(x, init_params, n_iter = 100, scale){
   
   ### x: the observations for which responsibilties will be calculated
   ### init_params: the initial values for the beta distributions
@@ -65,83 +59,91 @@ comp_resp <- function(x, init_params, n_iter, threshold){
   ###             3 = alpha parameter for second dist
   ###             4 = beta parameter for second dist
   ###             5 = the class split
-  ### n_iter: the number of times the estimation process will be run to generate results
-  ### threshold: a parameter to determine whether the model run should stop
+  ### n_iter: the number of times the estimation process will be run to generate results. Default value = 100
+  ### scale: used to reduce the initial estimates of alpha and beta to be reasonable starting points
   
   alpha1 <- init_params[1]
   beta1 <- init_params[2]
   alpha2 <- init_params[3]
   beta2 <- init_params[4]
   pi <- init_params[5]
-
-  initial_pop1 <- sapply(1:length(x), function(y) pbeta(x[y], alpha1, beta1, ncp = 0, lower.tail = TRUE, log.p = FALSE))
-  initial_pop2 <- sapply(1:length(x), function(y) pbeta(x[y], alpha2, beta2, ncp = 0, lower.tail = TRUE, log.p = FALSE))
-
-  resp <- NULL
+  
+  ### Generating probabilities that an observation would come from a given class
+  
+  initial_pop1 <- dbeta(x, alpha1, beta1)
+  initial_pop2 <- dbeta(x, alpha2, beta2)
+  
+  resp <- matrix(ncol = length(x))
+  
+  ### Normalising class responsibilities to ensure that pi + (1 - pi) = 1
   
   for (i in 1:length(x)){
-    
-    resp[i] = (pi * initial_pop2[i]) / ((1 - pi) * initial_pop1[i] + pi * initial_pop2[i])
-    
+   
+   resp[i] = (pi * initial_pop2[i]) / ((1 - pi) * initial_pop1[i] + pi * initial_pop2[i])
+   
   }
- 
-  #### Keep going until we get convergence
   
-  class_alloc <- NULL
+  results <- matrix(nrow = n_iter, ncol = 5)
   
-  shape1_0 <- NULL
-  shape2_0 <- NULL
+  ### Using randomly allocating the number of 
   
-  shape1_1 <- NULL
-  shape2_1 <- NULL
+  class_matrix <- matrix(nrow = n_iter, ncol = length(pop))
   
   for (i in 1:n_iter){
-    
-    class_alloc <- sapply(1:length(resp), function(x) rbinom(n = 1, size = 1, prob = resp[x]))
-    #### Do I fit the beta distributions based on the observations or the responsiveness measure for the classes?
-        
-    results <- data.frame(obs = x, resp = resp, class = class_alloc)
-
-    dist_0 <- fit_beta(results, alpha2, beta2, 0)
-    dist_1 <- fit_beta(results, alpha1, beta1, 1)
-    
-    shape1_0[i] <- dist_0[[1]]
-    shape2_0[i] <- dist_0[[2]]
-    
-    shape1_1[i] <- dist_1[[1]]
-    shape2_1[i] <- dist_1[[2]]
-    
+      
+      class_matrix[i, ] <- sapply(1:length(resp), function(y) rbinom(n = 1, size = 1, prob = resp[y]))
   }
   
-  pi_updated <- sum(resp) / length(x)
+  class_alloc <- apply(class_matrix, 2, median)
+  class_alloc[class_alloc == 0.5] <- rbinom(n = 1, size = 1, prob = 0.5)
+   
+  ### Dealing with classes that have medians of 0.5 (balanced counts of 0's and 1's). Should be very unlikey outside testing
   
-  output <- list(median(shape1_0), median(shape2_0), median(shape1_1), median(shape2_1), pi_updated)
+  df <- data.frame(pop = x, class = class_alloc)
   
-  diff <- c(alpha1 - output[[1]], beta1 - output[[2]], alpha2 - output[[3]], beta2 - output[[4]], pi - output[[5]])
+  pop_0 <- as.numeric(df$pop[df$class == 0])
+  pop_1 <- as.numeric(df$pop[df$class == 1])
   
-  if (min(abs(diff)) > threshold){
+  dist_0 <- fit_beta(pop_0, alpha1, beta1, scale)
+  dist_1 <- fit_beta(pop_1, alpha2, beta2, scale)
+      
+  shape1_0 <- dist_0['shape1']
+  shape2_0 <- dist_0['shape2']
+      
+  shape1_1 <- dist_1['shape1']
+  shape2_1 <- dist_1['shape2']
     
-     print ('Running recursion..')     
+  pi_updated <- sum(resp) / length(x)
+    
+  #output <- c(median(results[, 1]), median(results[, 2]), median(results[, 3]), median(results[, 4]), median(results[, 5]))
+  output <- c(shape1_0, shape2_0, shape1_1, shape2_1, pi_updated)
    
-     n <- n_iter
-     thres <- threshold
-     
-     comp_resp(x, as.numeric(output), n, thres)
-     
-   }
-   
-     print('Exiting program')
-     return(as.numeric(output))
+  print('Exiting program')
+  return(output)
+
 }
 
-estimates <- comp_resp(pop, init, 100, 0.001)
+library(distr)
+# 
+myMix <- UnivarMixingDistribution(Beta(shape1=20, shape2=0.5), 
+                                   Beta(shape1=1.5, shape2=20),
+                                   mixCoeff=c(0.6, 0.4))
 
-alpha1 <- 0.2
-beta1 <- 0.1
-alpha2 <- 0.4
-beta2 <- 0.6
+rmyMix <- r(myMix)
+x_test <- rmyMix(1000)
+
+alpha1 <- 0.5
+beta1 <- 0.25
+alpha2 <- 0.25
+beta2 <- 0.5
 pi <- 0.5
 
 init <- c(alpha1, beta1, alpha2, beta2, pi)
 
-estimates_1 <- comp_resp(pop, init, 1000, 0.001)
+est1 <- comp_params(x_test, init, 100, 1)
+est2 <- comp_params(x_test, est1, 100, 1)
+est3 <- comp_params(x_test, est2, 100, 1)
+est4 <- comp_params(x_test, est3, 100, 1)
+
+
+
